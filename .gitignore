@@ -16,6 +16,9 @@ __pycache__/
 # Node
 node_modules/
 .npm/
+.next/
+.turbo/
+.parcel-cache/
 
 # VSCode/Pycharm/etc
 .vscode/
@@ -23,3 +26,22 @@ node_modules/
 
 # Streamlit cache (if not needed in repo)
 **/.cache/
+
+# Python build/test artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+.hypothesis/
+
+# Environment files
+.env
+.env.*
+.python-version
+
+# Logs
+*.log

@@ -65,6 +65,13 @@ def explain_cell(data, row: int, col: int) -> Dict[str, Any]:
         "breakdown": {
             "danger": danger_breakdown(cell, hazards, currents),
         },
+        "source": "cells.csv, hazards.csv, currents.csv, corals.csv, resources.csv, life.csv, poi.csv",
+        "important_info": [
+            f"Danger: {danger:.2f}",
+            f"Eco impact: {eco:.2f}",
+            f"Resource: {resource:.2f}",
+            f"Combined: {combined:.2f}"
+        ],
     }
 
 

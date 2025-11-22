@@ -62,8 +62,6 @@ with col1:
     if payload is None:
         st.info("Ask AbyssGPT a question to visualize data here.")
         fig = build_default_map()
-        st.plotly_chart(fig, use_container_width=True)
-
     else:
         st.caption(f"Intent: {payload.get('intent', 'UNKNOWN')}")
 
@@ -81,9 +79,24 @@ with col1:
         if payload.get("highlights"):
             fig = add_highlights(fig, payload["highlights"])
 
-        # Show final figure
-        st.plotly_chart(fig, use_container_width=True)
+    # 4) Render figure (click-to-explain removed for stability)
+    st.plotly_chart(fig, use_container_width=True)
 
 # RIGHT PANEL — CHAT
 with col2:
     render_chat(height=400)
+    with st.expander("Route cost legend"):
+        st.markdown(
+            "- Cost blends **distance** with weighted risk layers.\n"
+            "- **Danger**: hazards, depth/pressure, unstable or fast currents.\n"
+            "- **Eco impact**: coral health/biodiversity and extraction impact of resources.\n"
+            "- Lower cost = safer and lower impact route."
+        )
+    with st.expander("Score definitions"):
+        st.markdown(
+            "- **Danger score**: risk from depth/pressure, hazards, and current speed/stability.\n"
+            "- **Resource score**: economic attractiveness from abundance, value, and purity.\n"
+            "- **Eco impact score**: ecological sensitivity from coral health/biodiversity and extraction impact/difficulty.\n"
+            "- **Combined score**: weighted merge of danger, eco, and resource per intent (e.g., mining, conservation, routing).\n"
+            "- **Score cell**: master wrapper that fetches cell context and returns the combined score for that (row, col)."
+        )

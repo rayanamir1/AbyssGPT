@@ -171,6 +171,7 @@ def score_cell(data, row: int, col: int, mode: str = "balanced") -> float:
 
 # Risk Rationale 
 def danger_breakdown(cell, hazards, currents):
+    """Explain the contributors to the danger score for a cell."""
     depth = _f(cell.get("depth_m", 0))
     hazard_count = len(hazards)
     current_speed = _f(currents[0].get("speed_mps", 0)) if currents else 0.0
@@ -185,6 +186,7 @@ def danger_breakdown(cell, hazards, currents):
 
 # Dynamic weighting 
 def adaptive_weights(cell):
+    """Adjust weights based on depth to bias danger vs eco vs resource."""
     depth = _f(cell.get("depth_m", 0))
 
     if depth > 4000:
@@ -197,6 +199,7 @@ def adaptive_weights(cell):
 
 # Weighted combination
 def combined_score_with_weights(danger, eco, resource, weights):
+    """Combine scores using custom weights (used by explain pipeline)."""
     return (
         resource * weights["resource"] -
         danger * weights["danger"] -
@@ -206,6 +209,7 @@ def combined_score_with_weights(danger, eco, resource, weights):
 
 # Global Normalization layer
 def normalize(value, min_val, max_val):
+    """Normalize a value to 0-1 given a min/max range."""
     if max_val == min_val:
         return 0
     return (value - min_val) / (max_val - min_val)

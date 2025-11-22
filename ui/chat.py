@@ -90,10 +90,19 @@ def _call_backend(user_text: str):
     # Save the full payload so the map panel can read it
     st.session_state.last_payload = result
 
-    # Get the answer text for the chat
+    # Compose structured reply: main answer + source + key bullets
     answer = result.get("answer", "I couldn't generate an answer.")
+    source = result.get("source", "Abyssal data layers")
+    important = result.get("important_info", [])
+
+    lines = [answer, f"- Where the data was found: {source}"]
+    if important:
+        lines.append("- Important info:")
+        lines.extend([f"  - {item}" for item in important])
+
+    formatted = "\n".join(lines)
     st.session_state.messages.append(
-        {"role": "assistant", "content": answer, "time": _now()}
+        {"role": "assistant", "content": formatted, "time": _now()}
     )
 
 

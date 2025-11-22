@@ -1,10 +1,17 @@
 # logic/core.py
 
 import re
+import numpy as np
 from logic.intent import classify_intent
 from logic.data_loader import AbyssData
 from logic.explain import explain_cell
 from logic.pathfinding import find_route
+from logic.scoring import (
+    danger_score,
+    eco_impact_score,
+    resource_score,
+    combined_score,
+)
 
 
 # Load datasets once (fast + prevents constant reloading)
@@ -62,7 +69,13 @@ def handle_query(query: str):
             "answer": f"Found a route from {start} to {end} with total risk cost {cost:.2f}.",
             "path": [{"row": r, "col": c} for (r, c) in path],
             "highlights": [],
-            "stats": {"cost": cost}
+            "stats": {"cost": cost},
+            "source": "cells.csv, hazards.csv, currents.csv, corals.csv",
+            "important_info": [
+                f"Total cost: {cost:.2f}",
+                f"Start: {start}, End: {end}",
+                "Cost blends distance, danger, and eco impact."
+            ],
         }
     
     # 3. Mining and Resource Analysis
@@ -95,19 +108,16 @@ def handle_query(query: str):
             "answer": "Here are the top recommended mining zones balancing profit and ecological impact.",
             "heatmap": heatmap.tolist(),
             "highlights": highlights,
+            "source": "cells.csv, resources.csv, corals.csv, hazards.csv, currents.csv",
+            "important_info": [
+                "Scores balance resource value against eco impact and danger.",
+                f"Top cell score: {max(scored):.2f}" if scored else "No scores available."
+            ],
         }
 
 
     # 4. Conservation Anlysis
     if itype == "conservation":
-        from logic.scoring import (
-            danger_score,
-            eco_impact_score,
-            resource_score,
-            combined_score
-        )
-        import numpy as np
-
         scored = []
         coords_list = []
 
@@ -141,7 +151,12 @@ def handle_query(query: str):
             "intent": "CONSERVATION",
             "answer": "These regions are highly sensitive ecological zones.",
             "heatmap": heatmap.tolist(),
-            "highlights": highlights
+            "highlights": highlights,
+            "source": "cells.csv, corals.csv, life.csv, resources.csv, hazards.csv",
+            "important_info": [
+                "Higher score = more fragile; avoid for mining.",
+                f"Top fragility score: {max(scored):.2f}" if scored else "No scores available."
+            ],
         }
 
 
