@@ -10,13 +10,6 @@ from logic.scoring import (
     danger_score,
     eco_impact_score,
     resource_score,
-    combined_score,
-)
-
-from logic.scoring import (
-    danger_score,
-    eco_impact_score,
-    resource_score,
     combined_score
 )
 
@@ -100,7 +93,6 @@ def handle_query(query: str):
             coords.append((r,c))
 
         # Build heatmap 50x50
-        import numpy as np
         heatmap = np.zeros((50,50))
         for idx, (r,c) in enumerate(coords):
             heatmap[r][c] = scored[idx]
