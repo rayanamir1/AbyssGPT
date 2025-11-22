@@ -13,6 +13,12 @@ from logic.scoring import (
     combined_score,
 )
 
+from logic.scoring import (
+    danger_score,
+    eco_impact_score,
+    resource_score,
+    combined_score
+)
 
 # Load datasets once (fast + prevents constant reloading)
 data = AbyssData()
@@ -118,12 +124,15 @@ def handle_query(query: str):
 
     # 4. Conservation Anlysis
     if itype == "conservation":
+<<<<<<< Updated upstream
+=======
+        import numpy as np
+
+>>>>>>> Stashed changes
         scored = []
         coords_list = []
 
-        # Iterate through every cell in the grid
         for (r, c), cell in data.cell_index.items():
-
             danger = danger_score(cell, data.get_hazards(r, c), data.get_currents(r, c))
             eco = eco_impact_score(
                 data.get_corals(r, c),
@@ -132,18 +141,15 @@ def handle_query(query: str):
             )
             resource = resource_score(data.get_resources(r, c))
 
-            # Conservation mode → fragile = high score
             combined = combined_score(danger, eco, resource, mode="conservation")
 
             scored.append(combined)
             coords_list.append((r, c))
 
-        # Build heatmap
         heatmap = np.zeros((50, 50))
         for idx, (r, c) in enumerate(coords_list):
             heatmap[r][c] = scored[idx]
 
-        # Highlight 5 most fragile ecological zones
         top_idx = np.argsort(scored)[-5:]
         highlights = [{"row": coords_list[i][0], "col": coords_list[i][1]} for i in top_idx]
 
@@ -158,6 +164,7 @@ def handle_query(query: str):
                 f"Top fragility score: {max(scored):.2f}" if scored else "No scores available."
             ],
         }
+
 
 
     # 5. Biodiversity and Hazard (using explain engine)
