@@ -1,8 +1,3 @@
-"""
-Template-driven explanation builder for a single grid cell.
-Consumes AbyssData lookups, scores the cell, and returns text + map metadata.
-"""
-
 from typing import Dict, Any, List
 from logic.scoring import (
     danger_score,
@@ -13,12 +8,15 @@ from logic.scoring import (
     danger_breakdown,
 )
 
+# --- safe float helper ---
+def _f(x):
+    try:
+        return float(x)
+    except:
+        return 0.0
+
 
 def explain_cell(data, row: int, col: int) -> Dict[str, Any]:
-    """
-    Fetch context for (row, col), compute scores, and assemble a narrative.
-    Returns an intent payload the UI can render (text, highlights, stats).
-    """
     cell = data.get_cell(row, col)
     if not cell:
         return {
@@ -28,7 +26,7 @@ def explain_cell(data, row: int, col: int) -> Dict[str, Any]:
             "stats": {},
         }
 
-    # Pull all layers for this coordinate
+    # Pull layers
     hazards = data.get_hazards(row, col)
     corals = data.get_corals(row, col)
     resources = data.get_resources(row, col)
@@ -36,14 +34,13 @@ def explain_cell(data, row: int, col: int) -> Dict[str, Any]:
     currents = data.get_currents(row, col)
     poi = data.get_poi(row, col)
 
-    # Compute core scores and a combined weighted score
+    # Compute scores
     danger = danger_score(cell, hazards, currents)
     resource = resource_score(resources)
     eco = eco_impact_score(corals, life, resources)
     weights = adaptive_weights(cell)
     combined = combined_score_with_weights(danger, eco, resource, weights)
 
-    # Build narrative from template snippets
     parts = [
         _describe_cell(cell),
         _describe_currents(currents),
@@ -71,72 +68,86 @@ def explain_cell(data, row: int, col: int) -> Dict[str, Any]:
     }
 
 
-def _describe_cell(cell: Dict[str, Any]) -> str:
-    """Base physical context: depth, biome, and temperature."""
+def _describe_cell(cell):
+    depth = _f(cell.get("depth_m", 0))
+    temp = _f(cell.get("temperature_c", 0))
+    biome = cell.get("biome", "unknown")
+
     return (
-        f"This cell sits at ~{int(cell.get('depth_m', 0))} m in a {cell.get('biome', 'unknown')} biome "
-        f"with temperature around {cell.get('temperature_c', 0):.1f}°C."
+        f"This cell sits at ~{int(depth)} m in a {biome} biome "
+        f"with temperature around {temp:.1f}°C."
     )
 
 
-def _describe_currents(currents: List[Dict[str, Any]]) -> str:
-    """Summarize current speed and stability if present."""
+def _describe_currents(currents):
     if not currents:
         return ""
+
     c = currents[0]
-    speed = c.get("speed_mps", 0)
-    stab = c.get("stability", 1.0)
-    note = "stable" if stab > 0.7 else "unstable"
+    speed = _f(c.get("speed_mps", 0))
+    stability = _f(c.get("stability", 1.0))
+
+    note = "stable" if stability > 0.7 else "unstable"
+
     if speed > 1.5:
         return f"Currents are {note} and strong (~{speed:.1f} m/s), adding nav risk."
+
     return f"Currents are {note} (~{speed:.1f} m/s)."
 
 
-def _describe_hazards(hazards: List[Dict[str, Any]]) -> str:
-    """Call out the most salient hazard, if any."""
+def _describe_hazards(hazards):
     if not hazards:
         return "No major hazards recorded."
+
     hz = hazards[0]
-    return f"Contains a {hz.get('type', 'hazard')} (severity {hz.get('severity', 0):.2f}), raising operational risk."
+    t = hz.get("type", "hazard")
+    severity = _f(hz.get("severity", 0))
+    return f"Contains a {t} (severity {severity:.2f}), raising operational risk."
 
 
-def _describe_corals(corals: List[Dict[str, Any]]) -> str:
-    """Describe coral health/biodiversity as an eco-sensitivity signal."""
+def _describe_corals(corals):
     if not corals:
         return ""
+
     c = corals[0]
-    health = c.get("health_index", 0)
-    biod = c.get("biodiversity_index", 0)
-    cover = c.get("coral_cover_pct", 0)
+    health = _f(c.get("health_index", 0))
+    biod = _f(c.get("biodiversity_index", 0))
+    cover = _f(c.get("coral_cover_pct", 0))
+
     if health > 0.7 and biod > 0.7:
         return f"High coral health (H={health:.2f}, B={biod:.2f}, cover ~{cover:.0f}%), ecologically valuable."
     if health < 0.3:
         return f"Coral health is low (H={health:.2f}), indicating sensitivity or prior disturbance."
+
     return f"Moderate coral presence (H={health:.2f}, B={biod:.2f}, cover ~{cover:.0f}%)."
 
 
-def _describe_resources(resources: List[Dict[str, Any]]) -> str:
-    """Surface the headline resource family/value/impact."""
+def _describe_resources(resources):
     if not resources:
         return "No notable resource deposits logged."
+
     r = resources[0]
     fam = r.get("family", r.get("type", "resource"))
-    val = r.get("economic_value", 0)
-    impact = r.get("environmental_impact", 0)
+    val = _f(r.get("economic_value", 0))
+    impact = _f(r.get("environmental_impact", 0))
+
     return f"Resources: {fam} (value {val:.2f}, impact {impact:.2f}); check extraction difficulty."
 
 
-def _describe_life(life: List[Dict[str, Any]]) -> str:
-    """Mention a representative species if present."""
+def _describe_life(life):
     if not life:
         return ""
+
     sp = life[0]
-    return f"Species noted: {sp.get('species', 'unknown')} (density {sp.get('density', 0)}, threat {sp.get('threat_level', 0)})."
+    density = _f(sp.get("density", 0))
+    threat = _f(sp.get("threat_level", 0))
+
+    return f"Species noted: {sp.get('species', 'unknown')} (density {density}, threat {threat})."
 
 
-def _describe_poi(poi: List[Dict[str, Any]]) -> str:
-    """Highlight a point of interest on this cell, if any."""
+def _describe_poi(poi):
     if not poi:
         return ""
+
     p = poi[0]
     return f"Point of interest: {p.get('label', p.get('category', 'POI'))} — {p.get('description', '')}"

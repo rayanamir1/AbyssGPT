@@ -1,207 +1,162 @@
+# logic/core.py
+
 import re
-import numpy as np
-import streamlit as st
-
-# ---------------------------
-# Intent detection (rule-based)
-# ---------------------------
-def detect_intent(query: str):
-    q = query.lower()
-
-    if any(k in q for k in ["route", "path", "from", "to", "safe route"]):
-        return "ROUTE"
-
-    if any(k in q for k in ["best", "mining", "extract", "profit", "resource", "optimal zone"]):
-        return "RECOMMEND_ZONES"
-
-    if any(k in q for k in ["explain", "why", "describe", "what is", "tell me about"]):
-        return "EXPLAIN"
-
-    return "UNKNOWN"
+from logic.intent import classify_intent
+from logic.data_loader import AbyssData
+from logic.explain import explain_cell
+from logic.pathfinding import find_route
 
 
-# ---------------------------
-# Simple scoring placeholders
-# (your teammate can upgrade later)
-# ---------------------------
-def danger_score(cell, hazards_df, currents_df):
-    r, c = int(cell["row"]), int(cell["col"])
-
-    hz = hazards_df[(hazards_df.row == r) & (hazards_df.col == c)]
-    hazard_severity = float(hz.severity.sum()) if len(hz) else 0.0
-
-    cur = currents_df[(currents_df.row == r) & (currents_df.col == c)]
-    instability = float(1 - cur.stability.values[0]) if len(cur) else 0.0
-
-    depth_factor = float(cell["depth_m"]) / 6000.0
-    return 0.6 * hazard_severity + 0.3 * instability + 0.1 * depth_factor
+# Load datasets once (fast + prevents constant reloading)
+data = AbyssData()
 
 
-def resource_score(cell, resources_df):
-    r, c = int(cell["row"]), int(cell["col"])
-    res = resources_df[(resources_df.row == r) & (resources_df.col == c)]
-    if len(res) == 0:
-        return 0.0
-
-    value = float(res.economic_value.values[0])
-    abundance = float(res.abundance.values[0])
-    difficulty = float(res.extraction_difficulty.values[0])
-    return (value * abundance) - difficulty
-
-
-def eco_impact_score(cell, corals_df, resources_df):
-    r, c = int(cell["row"]), int(cell["col"])
-
-    coral = corals_df[(corals_df.row == r) & (corals_df.col == c)]
-    coral_damage = 0.0
-    if len(coral):
-        coral_damage = (float(coral.coral_cover_pct.values[0]) / 100.0) * float(coral.health_index.values[0])
-
-    res = resources_df[(resources_df.row == r) & (resources_df.col == c)]
-    extraction_impact = float(res.environmental_impact.values[0]) if len(res) else 0.0
-
-    return 0.5 * coral_damage + 0.5 * extraction_impact
-
-
-# ---------------------------
-# Template explanation generator
-# ---------------------------
-def explain_cell(cell, hazards_df, corals_df, resources_df, currents_df):
-    parts = []
-    parts.append(
-        f"This cell is at ~{int(cell['depth_m'])} m in a **{cell['biome']}** biome "
-        f"with temperature around {cell['temperature_c']:.1f}°C."
-    )
-
-    hz = hazards_df[(hazards_df.row == cell.row) & (hazards_df.col == cell.col)]
-    if len(hz):
-        parts.append(
-            f"It contains a **{hz.type.values[0]}** hazard (severity {hz.severity.values[0]:.2f}), "
-            "so manned operations are higher risk."
-        )
-
-    coral = corals_df[(corals_df.row == cell.row) & (corals_df.col == cell.col)]
-    if len(coral):
-        hi = float(coral.health_index.values[0])
-        bi = float(coral.biodiversity_index.values[0])
-        if hi > 0.7 and bi > 0.7:
-            parts.append("Coral health and biodiversity are high, making this ecologically valuable.")
-        elif hi < 0.3:
-            parts.append("Coral health is low, suggesting sensitivity or prior disturbance.")
-
-    res = resources_df[(resources_df.row == cell.row) & (resources_df.col == cell.col)]
-    if len(res):
-        parts.append(
-            f"Resources detected: **{res.type.values[0]}** with economic value "
-            f"{float(res.economic_value.values[0]):.2f}."
-        )
-
-    cur = currents_df[(currents_df.row == cell.row) & (currents_df.col == cell.col)]
-    if len(cur) and float(cur.speed_mps.values[0]) > 1.5:
-        parts.append("Currents are strong here, which increases navigation difficulty.")
-
-    return " ".join(parts)
-
-
-# ---------------------------
-# MAIN ENTRYPOINT your chat calls
-# ---------------------------
 def handle_query(query: str):
-    dfs = st.session_state.dfs
-    cells = dfs["cells"]
-    hazards = dfs["hazards"]
-    currents = dfs["currents"]
-    corals = dfs["corals"]
-    resources = dfs["resources"]
+    """
+    Main backend router.
+    Takes a user query in natural language,
+    extracts intent + coordinates,
+    executes the correct module,
+    and returns a unified payload for Streamlit.
+    """
 
-    intent = detect_intent(query)
+    intent = classify_intent(query)
+    itype = intent["intent"]
+    coords = intent["coords"]
 
-    # ---------------- EXPLAIN ----------------
-    if intent == "EXPLAIN":
-        # If user gave a coordinate like (12,33), parse it.
-        m = re.search(r"\((\d+)\s*,\s*(\d+)\)", query)
-        if m:
-            r, c = int(m.group(1)), int(m.group(2))
-            cell_row = cells[(cells.row == r) & (cells.col == c)]
-        else:
-            # default cell for now (center-ish)
-            cell_row = cells[(cells.row == 25) & (cells.col == 25)]
+    # 1. Exlanation and Coordinate Lookups
+    if itype in ["coordinate_info", "explain_region"]:
+        if coords is None:
+            return {
+                "intent": "EXPLAIN",
+                "answer": "Please specify coordinates like (row, col)."
+            }
 
-        if len(cell_row) == 0:
-            return {"answer": "I couldn't find that cell. Try another coordinate."}
+        r, c = coords
+        return explain_cell(data, r, c)
 
-        cell = cell_row.iloc[0]
-        answer = explain_cell(cell, hazards, corals, resources, currents)
+    # 2. Route-Finding (Safe / balanced)
+    if itype in ["safe_route", "fast_route"]:
 
-        stats = {
-            "danger": float(danger_score(cell, hazards, currents)),
-            "ecoImpact": float(eco_impact_score(cell, corals, resources)),
-            "resource": float(resource_score(cell, resources))
-        }
+        # Extract coordinates: expecting two of them
+        matches = re.findall(r"\(?\s*(\d+)\s*,\s*(\d+)\s*\)?", query)
+        if len(matches) < 2:
+            return {
+                "intent": "ROUTE",
+                "answer": "Specify start AND end coordinates, e.g., (2,3) to (10,15)."
+            }
 
-        return {
-            "intent": "EXPLAIN",
-            "answer": answer,
-            "highlights": [{"row": int(cell.row), "col": int(cell.col)}],
-            "stats": stats
-        }
+        start = (int(matches[0][0]), int(matches[0][1]))
+        end   = (int(matches[1][0]), int(matches[1][1]))
 
-    # ---------------- RECOMMEND ----------------
-    if intent == "RECOMMEND_ZONES":
-        scored = []
-        for _, cell in cells.iterrows():
-            rs = resource_score(cell, resources)
-            es = eco_impact_score(cell, corals, resources)
-            ds = danger_score(cell, hazards, currents)
-            combined = rs - 1.2*es - 0.5*ds
-            scored.append(combined)
+        path, cost = find_route(start, end, data)
 
-        scored = np.array(scored)
-        top_idx = scored.argsort()[-5:][::-1]
-        top_cells = cells.iloc[top_idx]
-
-        highlights = [
-            {"row": int(r), "col": int(c), "score": float(sc)}
-            for (r, c, sc) in zip(top_cells.row, top_cells.col, scored[top_idx])
-        ]
-
-        answer = (
-            "Here are the top mining zones balancing high economic value with low coral impact "
-            "and manageable hazard risk."
-        )
-
-        return {
-            "intent": "RECOMMEND_ZONES",
-            "answer": answer,
-            "highlights": highlights,
-            # optional heatmap for map panel later:
-            "heatmap": scored.reshape(50, 50).tolist()
-        }
-
-    # ---------------- ROUTE ----------------
-    if intent == "ROUTE":
-        # For now, just parse start/end like (r1,c1) to (r2,c2)
-        coords = re.findall(r"\((\d+)\s*,\s*(\d+)\)", query)
-        if len(coords) >= 2:
-            (r1, c1), (r2, c2) = coords[0], coords[1]
-            start, end = (int(r1), int(c1)), (int(r2), int(c2))
-        else:
-            start, end = (0, 0), (49, 49)
-
-        # STUB PATH (real A* comes later)
-        path = [{"row": start[0], "col": start[1]}, {"row": end[0], "col": end[1]}]
-
-        answer = f"Plotted a safe route from {start} to {end}. (Routing engine placeholder for now.)"
+        if path is None:
+            return {
+                "intent": "ROUTE",
+                "answer": "No viable route was found between these coordinates."
+            }
 
         return {
             "intent": "ROUTE",
-            "answer": answer,
-            "path": path,
-            "stats": {"danger": 0.0, "ecoImpact": 0.0, "resource": 0.0}
+            "answer": f"Found a route from {start} to {end} with total risk cost {cost:.2f}.",
+            "path": [{"row": r, "col": c} for (r, c) in path],
+            "highlights": [],
+            "stats": {"cost": cost}
+        }
+    
+    # 3. Mining and Resource Analysis
+    if itype == "mining":
+        scored = []
+        coords = []
+
+        # score each cell
+        for (r, c), cell in data.cell_index.items():
+            danger = danger_score(cell, data.get_hazards(r,c), data.get_currents(r,c))
+            eco = eco_impact_score(data.get_corals(r,c), data.get_life(r,c), data.get_resources(r,c))
+            resource = resource_score(data.get_resources(r,c))
+            combined = combined_score(danger, eco, resource, mode="mining")
+            
+            scored.append(combined)
+            coords.append((r,c))
+
+        # Build heatmap 50x50
+        import numpy as np
+        heatmap = np.zeros((50,50))
+        for idx, (r,c) in enumerate(coords):
+            heatmap[r][c] = scored[idx]
+
+        # Top 5 mining zones
+        top_idx = np.argsort(scored)[-5:]
+        highlights = [{"row": coords[i][0], "col": coords[i][1]} for i in top_idx]
+
+        return {
+            "intent": "MINING",
+            "answer": "Here are the top recommended mining zones balancing profit and ecological impact.",
+            "heatmap": heatmap.tolist(),
+            "highlights": highlights,
         }
 
-    # ---------------- UNKNOWN ----------------
+
+    # 4. Conservation Anlysis
+    if itype == "conservation":
+        from logic.scoring import (
+            danger_score,
+            eco_impact_score,
+            resource_score,
+            combined_score
+        )
+        import numpy as np
+
+        scored = []
+        coords_list = []
+
+        # Iterate through every cell in the grid
+        for (r, c), cell in data.cell_index.items():
+
+            danger = danger_score(cell, data.get_hazards(r, c), data.get_currents(r, c))
+            eco = eco_impact_score(
+                data.get_corals(r, c),
+                data.get_life(r, c),
+                data.get_resources(r, c)
+            )
+            resource = resource_score(data.get_resources(r, c))
+
+            # Conservation mode → fragile = high score
+            combined = combined_score(danger, eco, resource, mode="conservation")
+
+            scored.append(combined)
+            coords_list.append((r, c))
+
+        # Build heatmap
+        heatmap = np.zeros((50, 50))
+        for idx, (r, c) in enumerate(coords_list):
+            heatmap[r][c] = scored[idx]
+
+        # Highlight 5 most fragile ecological zones
+        top_idx = np.argsort(scored)[-5:]
+        highlights = [{"row": coords_list[i][0], "col": coords_list[i][1]} for i in top_idx]
+
+        return {
+            "intent": "CONSERVATION",
+            "answer": "These regions are highly sensitive ecological zones.",
+            "heatmap": heatmap.tolist(),
+            "highlights": highlights
+        }
+
+
+    # 5. Biodiversity and Hazard (using explain engine)
+    if itype in ["life_analysis", "hazard_analysis", "poi_lookup"]:
+        if coords is None:
+            return {"answer": "Please include coordinates for analysis."}
+        r, c = coords
+        return explain_cell(data, r, c)
+
+    # 6. Fallback
     return {
         "intent": "UNKNOWN",
-        "answer": "Try asking about hazards, mining, biodiversity, or a route between two points."
+        "answer": (
+            "I couldn’t understand your request. "
+            "Try asking about routes, hazards, resources, biodiversity, or coordinates."
+        )
     }

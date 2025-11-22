@@ -1,16 +1,20 @@
-import pandas as pd
 import streamlit as st
+st.set_page_config(layout="wide")   # MUST be first Streamlit command
+
+import pandas as pd
 
 # --- import chat renderer ---
 from ui.chat import render_chat
 
-# ❗ FIXED: import handle_query from core backend, NOT explain
+# Backend core handler
 from logic.core import handle_query
 
+# Map utilities
 from ui.map import render_heatmap, add_route, build_default_map, add_highlights
 
+
 # ---------------------------
-# Data loading (cache so it doesn't reload every interaction)
+# Data loading (cached)
 # ---------------------------
 @st.cache_data
 def load_data():
@@ -24,6 +28,7 @@ def load_data():
 
     cells_lookup = cells.set_index(["row", "col"]).to_dict(orient="index")
     return cells, hazards, currents, corals, resources, life, poi, cells_lookup
+
 
 cells, hazards, currents, corals, resources, life, poi, cells_lookup = load_data()
 
@@ -40,14 +45,15 @@ if "dfs" not in st.session_state:
         "cells_lookup": cells_lookup
     }
 
+
 # ---------------------------
 # Page layout
 # ---------------------------
-st.set_page_config(layout="wide")
 st.title("🌊 AbyssGPT — Deep Sea Intelligence Assistant")
 
 col1, col2 = st.columns([3, 2])
 
+# LEFT PANEL — MAP
 with col1:
     st.subheader("Map")
 
@@ -55,32 +61,29 @@ with col1:
 
     if payload is None:
         st.info("Ask AbyssGPT a question to visualize data here.")
-        # Show a default depth map so the judges see *something* even before a query
         fig = build_default_map()
         st.plotly_chart(fig, use_container_width=True)
+
     else:
-        # Optional tiny debug line
         st.caption(f"Intent: {payload.get('intent', 'UNKNOWN')}")
 
-        # 1) Choose base heatmap
+        # 1) Base heatmap
         if payload.get("heatmap"):
-            # Use backend scoring grid (e.g. mining zones)
             fig = render_heatmap(payload["heatmap"])
         else:
-            # Fallback: depth map
             fig = build_default_map()
 
-        # 2) Add route if present
+        # 2) Route overlay
         if payload.get("path"):
             fig = add_route(fig, payload["path"])
 
-        # 3) Add highlights if present
+        # 3) Highlight cells
         if payload.get("highlights"):
             fig = add_highlights(fig, payload["highlights"])
 
-        # 4) Show the final figure
+        # Show final figure
         st.plotly_chart(fig, use_container_width=True)
 
-
+# RIGHT PANEL — CHAT
 with col2:
     render_chat(height=400)

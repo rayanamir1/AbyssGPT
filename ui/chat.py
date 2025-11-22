@@ -60,7 +60,7 @@ def render_chat(height=520):
         with cols[i]:
             if st.button(p, use_container_width=True):
                 _add_user_message(p)
-                _add_assistant_placeholder(p)
+                _call_backend(p)
 
     # ---------------------------
     # Input (native)
@@ -69,7 +69,7 @@ def render_chat(height=520):
 
     if user_text and user_text.strip():
         _add_user_message(user_text.strip())
-        _add_assistant_placeholder(user_text.strip())
+        _call_backend(user_text.strip()) # Backend response
 
 
 # ---------------------------
