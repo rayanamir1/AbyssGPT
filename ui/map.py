@@ -117,5 +117,5 @@ def _style_common(fig):
             autorange="reversed",  # so row 0 appears at the top
         ),
         margin=dict(l=0, r=0, t=0, b=0),
-        height=700,
+        height=520,
     )
