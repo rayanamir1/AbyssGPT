@@ -18,66 +18,6 @@ def _neighbours(coord: Coord, max_row: int, max_col: int):
         if 0 <= nr < max_row and 0 <= nc < max_col: # stay in grid bounds
             yield(nr,nc)
 
-def _build_cell_features(row: int, col: int, data: AbyssData) -> dict | None:
-    """
-    Build a single cell dictionary for this (row, column).
-    scoring.py can read everything from this one place
-    """
-    base = data.get_cell(row,col)
-    if base is None:
-        return None
-    
-    # Start with core information from cells.csv
-    cell = dict(base)   # So we dont have to modify the original row
-
-    # Hazards
-    hazards = data.get_hazards(row, col)
-    if hazards:
-        worst = max(hazards, key=lambda h: h.get("severity", 0.0))
-        cell["hazard_type"] = worst.get("type")
-        cell["hazard_severity"] = worst.get("severity", 0.0)
-    else:   # No hazard rows
-        cell.setdefault("hazard_type", None)
-        cell.setdefault("hazard_severity", 0.0)
-    
-    # Corals
-    corals = data.get_corals(row, col)
-    if corals:
-        c = corals[0]   # Use first coral record
-        cell["coral_cover_pct"] = c.get("coral_cover_pct", 0.0)
-        cell["coral_health_index"] = c.get("health_index", 0.0)
-        cell["biodiversity_index"] = c.get("biodiversity_index", 0.0)
-    else:   # No coral data
-        cell.setdefault("coral_cover_pct", 0.0)
-        cell.setdefault("coral_health_index", 0.0)
-        cell.setdefault("biodiversity_index", 0.0)
-   
-    # Resources
-    resources = data.get_resources(row, col)
-    if resources:
-        r = resources[0]    # Use first resource row
-        cell["resource_abundance"] = r.get("abundance", 0.0)
-        cell["economic_value"] = r.get("economic_value", 0.0)
-        cell["extraction_difficulty"] = r.get("extraction_difficulty", 0.0)
-        cell["environmental_impact"] = r.get("environmental_impact", 0.0)
-    else:   # No resources data
-        cell.setdefault("resource_abundance", 0.0)
-        cell.setdefault("economic_value", 0.0)
-        cell.setdefault("extraction_difficulty", 0.0)
-        cell.setdefault("environmental_impact", 0.0)
-
-    # Currents
-    currents = data.get_currents(row, col)
-    if currents:
-        cur = currents[0]
-        cell["current_speed_mps"] = cur.get("speed_mps", 0.0)
-        cell["current_stability"] = cur.get("stability", 1.0)
-    else:
-        cell.setdefault("current_speed_mps", 0.0)
-        cell.setdefault("current_stability", 1.0)
-
-    return cell
-
 def _route_cost(coord: Coord, data: AbyssData) -> float:
     """
     Cost of moving into this coordinate
