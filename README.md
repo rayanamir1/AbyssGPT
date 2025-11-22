@@ -87,20 +87,24 @@ Built using Streamlit native chat components:
 ## Project Structure
 
 AbyssGPT/
-│── app.py # Main Streamlit app
-│── ui/
-│ ├── chat.py # Chat interface
-│ └── map.py # Plotly visualization
-│── logic/
-│ ├── core.py # Query router + intent logic
-│ ├── explain.py # Natural language output
-│ ├── pathfinding.py # Navigation engine
-│ ├── scoring.py # Risk & resource model
-│ ├── data_loader.py # CSV loading & indexing
-│ └── intent.py # Natural-language intent parser
-│── data/ # All marine datasets
-│── README.md
-│── requirements.txt
+│── app.py                  # Main Streamlit application
+│
+├── ui/                     # User interface components
+│   ├── chat.py             # Chat interface + Streamlit message system
+│   └── map.py              # Plotly map visualization layer
+│
+├── logic/                  # Core backend intelligence
+│   ├── core.py             # Query router + intent execution engine
+│   ├── explain.py          # Natural-language region explanations
+│   ├── pathfinding.py      # Navigation + safe-route computation
+│   ├── scoring.py          # Danger, eco, resource scoring system
+│   ├── data_loader.py      # Dataset loader + indexing utilities
+│   └── intent.py           # Natural-language intent classification
+│
+├── data/                   # All marine datasets (CSV files)
+│
+├── README.md               # Full project documentation
+└── requirements.txt        # Python dependencies
 
 ---
 
