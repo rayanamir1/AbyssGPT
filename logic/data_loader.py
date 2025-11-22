@@ -91,6 +91,17 @@ class AbyssData:
         self.life_index = self._build_simple_index(self.life)
         self.poi_index = self._build_simple_index(self.poi)
 
+        # Currents index
+        self.hazard_index = self._build_simple_index(self.hazards)
+        self.coral_index = self._build_simple_index(self.corals)
+        self.resource_index = self._build_simple_index(self.resources)
+        self.life_index = self._build_simple_index(self.life)
+        self.poi_index = self._build_simple_index(self.poi)
+
+        self.currents_index = self._build_simple_index(self.currents)
+
+
+
     @staticmethod
     def _build_simple_index(df: pd.DataFrame) -> Dict[Tuple[int, int], list]:
         """
@@ -123,6 +134,9 @@ class AbyssData:
 
     def get_poi(self, row: int, col: int):
         return self.poi_index.get((row, col), [])
+    
+    def get_currents(self, row: int, col: int):
+        return self.currents_index.get((row, col), [])
 
 if __name__ == "__main__":
     data = AbyssData()
