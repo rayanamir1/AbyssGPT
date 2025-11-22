@@ -1,0 +1,25 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.swp
+*.swo
+*.DS_Store
+.env
+.venv
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+.streamlit/
+
+# Node
+node_modules/
+.npm/
+
+# VSCode/Pycharm/etc
+.vscode/
+.idea/
+
+# Streamlit cache (if not needed in repo)
+**/.cache/
