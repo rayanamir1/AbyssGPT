@@ -7,6 +7,8 @@ from ui.chat import render_chat
 # ❗ FIXED: import handle_query from core backend, NOT explain
 from logic.core import handle_query
 
+from ui.map import render_heatmap, add_route, build_default_map, add_highlights
+
 # ---------------------------
 # Data loading (cache so it doesn't reload every interaction)
 # ---------------------------
@@ -53,23 +55,32 @@ with col1:
 
     if payload is None:
         st.info("Ask AbyssGPT a question to visualize data here.")
+        # Show a default depth map so the judges see *something* even before a query
+        fig = build_default_map()
+        st.plotly_chart(fig, use_container_width=True)
     else:
-        st.write("Map payload received:")
-        st.json({
-            "intent": payload.get("intent"),
-            "has_heatmap": payload.get("heatmap") is not None,
-            "has_path": payload.get("path") is not None,
-            "num_highlights": len(payload.get("highlights", []))
-        })
+        # Optional tiny debug line
+        st.caption(f"Intent: {payload.get('intent', 'UNKNOWN')}")
 
-        # Example hooks (implement these later)
-        # if payload.get("heatmap"):
-        #     fig = render_heatmap(payload["heatmap"])
-        #     st.plotly_chart(fig, use_container_width=True)
-        #
-        # if payload.get("path"):
-        #     fig = add_route(fig, payload["path"])
-        #     st.plotly_chart(fig, use_container_width=True)
+        # 1) Choose base heatmap
+        if payload.get("heatmap"):
+            # Use backend scoring grid (e.g. mining zones)
+            fig = render_heatmap(payload["heatmap"])
+        else:
+            # Fallback: depth map
+            fig = build_default_map()
+
+        # 2) Add route if present
+        if payload.get("path"):
+            fig = add_route(fig, payload["path"])
+
+        # 3) Add highlights if present
+        if payload.get("highlights"):
+            fig = add_highlights(fig, payload["highlights"])
+
+        # 4) Show the final figure
+        st.plotly_chart(fig, use_container_width=True)
+
 
 with col2:
     render_chat(height=400)

@@ -1,6 +1,8 @@
 # ui/chat.py
 import streamlit as st
 from datetime import datetime
+from logic.core import handle_query
+
 
 def render_chat(height=520):
     """
@@ -77,6 +79,23 @@ def _add_user_message(text: str):
     st.session_state.messages.append(
         {"role": "user", "content": text, "time": _now()}
     )
+
+def _call_backend(user_text: str):
+    """
+    Send the user's text to the backend (logic.core.handle_query),
+    store the payload for the map, and add the assistant's reply to the chat.
+    """
+    result = handle_query(user_text)
+
+    # Save the full payload so the map panel can read it
+    st.session_state.last_payload = result
+
+    # Get the answer text for the chat
+    answer = result.get("answer", "I couldn't generate an answer.")
+    st.session_state.messages.append(
+        {"role": "assistant", "content": answer, "time": _now()}
+    )
+
 
 def _add_assistant_placeholder(user_text: str):
     canned = [
