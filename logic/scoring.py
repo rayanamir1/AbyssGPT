@@ -140,6 +140,10 @@ def combined_score(
     if mode == "safe_route":
         # A* uses the cost, danger is the cost and eco is the slight modifier
         return (danger * 1.0) + (0.25 * eco)
+    
+    if mode == "fast_route":
+        return 0.0  # uniform cost → shortest path
+
 
     # Default; this is balanced
     return resource - (0.25 * danger) - (0.35 * eco)

@@ -2,77 +2,74 @@ from __future__ import annotations
 from typing import Tuple, List
 import networkx as nx
 from .data_loader import AbyssData
-from .scoring import (score_cell)
+from .scoring import score_cell
 
 Coord = Tuple[int, int]
-# Allowed moves; down, up, right, left (no diagonals)
+# Allowed moves: down, up, right, left (no diagonals)
 DIRS: list[Coord] = [(1,0), (-1,0), (0,1), (0,-1)]
 
+
 def _neighbours(coord: Coord, max_row: int, max_col: int):
-    """
-    Given a cell (Row, Column), yield valid neighbours in cell
-    """
     r, c = coord
-    for dr, dc in DIRS: # delta row, delta column
-        nr, nc = r + dr, c + dc # neighbour row, neioghbour column
-        if 0 <= nr < max_row and 0 <= nc < max_col: # stay in grid bounds
-            yield(nr,nc)
+    for dr, dc in DIRS:
+        nr, nc = r + dr, c + dc
+        if 0 <= nr < max_row and 0 <= nc < max_col:
+            yield (nr, nc)
 
-def _route_cost(coord: Coord, data: AbyssData) -> float:
+
+def _route_cost(coord: Coord, data: AbyssData, mode="safe_route"):
     """
-    Cost of moving into this coordinate
-    Bigger number = worse || try to avoid high-cost cells
-
+    Cost of stepping INTO a neighbour cell.
+    Mode controls behavior:
+      - safe_route = avoid danger
+      - fast_route = ignore danger, choose shortest path
     """
-
     row, col = coord
     if data.get_cell(row, col) is None:
         return float("inf")
-    
-    risk_cost = score_cell(data, row, col, mode="safe_route")   # Risk cost from scoring.py
-    base_step_cost = 1.0    # Every move costs atleast 1
 
-    return base_step_cost + risk_cost
+    # Use correct scoring mode
+    risk_cost = score_cell(data, row, col, mode=mode)
 
-def build_graph(data: AbyssData) -> nx.DiGraph:
+    # Every step costs at least 1
+    return 1.0 + risk_cost
+
+
+def build_graph(data: AbyssData, mode="safe_route") -> nx.DiGraph:
     """
-    Find best route from start to end
-    Edge node = (row, col)
-    Edges go from cell to each of their neighbours
-    Edge weight for stepping into the grid
+    Build the navigation graph with weights depending on route mode.
     """
-    G = nx.DiGraph()    # Empty graph
-    max_row = int(data.cells["row"].max()) + 1  # Use these to stay in grid bounds
-    max_col = int(data.cells["col"].max()) + 1  
+    G = nx.DiGraph()
+    max_row = int(data.cells["row"].max()) + 1
+    max_col = int(data.cells["col"].max()) + 1
 
-    # Add nodes for each known cell
+    # Add nodes
     for coord in data.cell_index.keys():
         G.add_node(coord)
-    
-    # Add edges with weights to neighbours
+
+    # Add weighted edges
     for coord in data.cell_index.keys():
         for nb in _neighbours(coord, max_row, max_col):
             if data.get_cell(*nb) is None:
-                continue    # Skip the non existent cells
-            
-            cost = _route_cost(nb, data)
+                continue
+            cost = _route_cost(nb, data, mode)
             G.add_edge(coord, nb, weight=cost)
+
     return G
 
-def find_route(start: Coord, end: Coord, data: AbyssData,) -> tuple[List[Coord] | None, float]:
+
+def find_route(start: Coord, end: Coord, data: AbyssData, mode="safe_route") -> tuple[List[Coord] | None, float]:
     """
-    Find safest route from start to end
-    NetworkX shortest_path with our risk based edge weights
-    returns a list of coordinates, or None if no path exists
-    and total cost for the path
+    Compute the path using Dijkstra with mode-specific weights.
     """
-    G = build_graph(data)   # Build graph
+    G = build_graph(data, mode=mode)
+
     if start not in G or end not in G:
-        return None, float("inf")   # if not in G, none ofr path, infinity for cost
-    
-    try:   # Uses Dijkstras algorithm
-        path: List[Coord] = nx.shortest_path(G, source = start, target = end, weight="weight")
-        total_cost: float = nx.path_weight(G, path, weight="weight")
+        return None, float("inf")
+
+    try:
+        path = nx.shortest_path(G, source=start, target=end, weight="weight")
+        total_cost = nx.path_weight(G, path, weight="weight")
         return path, total_cost
     except nx.NetworkXNoPath:
         return None, float("inf")

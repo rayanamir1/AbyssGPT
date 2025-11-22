@@ -55,7 +55,7 @@ def handle_query(query: str):
         start = (int(matches[0][0]), int(matches[0][1]))
         end   = (int(matches[1][0]), int(matches[1][1]))
 
-        path, cost = find_route(start, end, data)
+        path, cost = find_route(start, end, data, mode=itype)
 
         if path is None:
             return {
