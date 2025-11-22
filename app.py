@@ -90,7 +90,7 @@ with col2:
             "- Cost blends **distance** with weighted risk layers.\n"
             "- **Danger**: hazards, depth/pressure, unstable or fast currents.\n"
             "- **Eco impact**: coral health/biodiversity and extraction impact of resources.\n"
-            "- Lower cost = safer and lower impact route."
+            "- Lower cost: safer and lower impact route."
         )
     with st.expander("Score definitions"):
         st.markdown(
