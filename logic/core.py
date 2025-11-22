@@ -124,11 +124,6 @@ def handle_query(query: str):
 
     # 4. Conservation Anlysis
     if itype == "conservation":
-<<<<<<< Updated upstream
-=======
-        import numpy as np
-
->>>>>>> Stashed changes
         scored = []
         coords_list = []
 
